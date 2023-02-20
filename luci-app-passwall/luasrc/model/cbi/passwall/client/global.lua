@@ -1,4 +1,4 @@
-local api = require "luci.model.cbi.passwall.api.api"
+local api = require "luci.passwall.api"
 local appname = api.appname
 local uci = api.uci
 local datatypes = api.datatypes
@@ -13,18 +13,18 @@ for k, e in ipairs(api.get_valid_nodes()) do
     nodes_table[#nodes_table + 1] = e
 end
 
+local tcp_socks_server = "127.0.0.1" .. ":" .. (uci:get(appname, "@global[0]", "tcp_node_socks_port") or "1070")
 local socks_table = {}
+socks_table[#socks_table + 1] = {
+    id = tcp_socks_server,
+    remarks = tcp_socks_server .. " - " .. translate("TCP Node")
+}
 uci:foreach(appname, "socks", function(s)
     if s.enabled == "1" and s.node then
         local id, remarks
-        local same, i = s.node:match("^(tcp)")
-        if same then
-            remarks = translatef("Same as the tcp node")
-        else
-            for k, n in pairs(nodes_table) do
-                if (s.node == n.id) then
-                    remarks = n["remark"]; break
-                end
+        for k, n in pairs(nodes_table) do
+            if (s.node == n.id) then
+                remarks = n["remark"]; break
             end
         end
         id = "127.0.0.1" .. ":" .. s.port
@@ -169,19 +169,20 @@ udp_node = s:taboption("Main", ListValue, "udp_node", "<a style='color: red'>" .
 udp_node:value("nil", translate("Close"))
 udp_node:value("tcp", translate("Same as the tcp node"))
 
-s:tab("DNS", translate("DNS"))
+tcp_node_socks_port = s:taboption("Main", Value, "tcp_node_socks_port", translate("TCP Node") .. " Socks " .. translate("Listen Port"))
+tcp_node_socks_port.default = 1070
+tcp_node_socks_port.datatype = "port"
 
-if api.is_finded("smartdns") then
-    dns_shunt = s:taboption("DNS", ListValue, "dns_shunt", translate("DNS Shunt"))
-    dns_shunt:value("dnsmasq", "Dnsmasq")
-    dns_shunt:value("smartdns", "SmartDNS")
-
-    group_domestic = s:taboption("DNS", Value, "group_domestic", translate("Domestic group name"))
-    group_domestic.placeholder = "local"
-    group_domestic:depends("dns_shunt", "smartdns")
-    group_domestic.description = translate("You only need to configure domestic DNS packets in SmartDNS and set it redirect or as Dnsmasq upstream, and fill in the domestic DNS group name here.")
-    group_domestic.description = group_domestic.description .. string.format('<a href="%s" target="_blank">%s</a>', "https://github.com/luckyyyyy/blog/issues/57", translate("Guide"))
+--[[
+if has_v2ray or has_xray then
+    tcp_node_http_port = s:taboption("Main", Value, "tcp_node_http_port", translate("TCP Node") .. " HTTP " .. translate("Listen Port") .. " " .. translate("0 is not use"))
+    tcp_node_http_port.default = 0
+    tcp_node_http_port.datatype = "port"
 end
+]]--
+
+
+s:tab("DNS", translate("DNS"))
 
 o = s:taboption("DNS", Flag, "filter_proxy_ipv6", translate("Filter Proxy Host IPv6"), translate("Experimental feature."))
 o.default = "0"
@@ -196,9 +197,6 @@ end
 if api.is_finded("dns2socks") then
     dns_mode:value("dns2socks", "dns2socks")
 end
-if has_v2ray then
-    dns_mode:value("v2ray", "V2ray")
-end
 if has_xray then
     dns_mode:value("xray", "Xray")
 end
@@ -208,7 +206,6 @@ o = s:taboption("DNS", ListValue, "v2ray_dns_mode", " ")
 o:value("tcp", "TCP")
 o:value("doh", "DoH")
 o:value("fakedns", "FakeDNS")
-o:depends("dns_mode", "v2ray")
 o:depends("dns_mode", "xray")
 o.validate = function(self, value, t)
     if value == "fakedns" then
@@ -223,6 +220,7 @@ end
 
 o = s:taboption("DNS", Value, "socks_server", translate("Socks Server"), translate("Make sure socks service is available on this address."))
 for k, v in pairs(socks_table) do o:value(v.id, v.remarks) end
+o.default = socks_table[1].id
 o.validate = function(self, value, t)
     if not datatypes.ipaddrport(value) then
         return nil, translate("Socks Server") .. " " .. translate("Not valid IP format, please re-enter!")
@@ -272,8 +270,6 @@ o:depends("v2ray_dns_mode", "doh")
 o = s:taboption("DNS", Flag, "dns_cache", translate("Cache Resolved"))
 o.default = "1"
 o:depends({dns_mode = "dns2socks"})
-o:depends({dns_mode = "v2ray", v2ray_dns_mode = "tcp"})
-o:depends({dns_mode = "v2ray", v2ray_dns_mode = "doh"})
 o:depends({dns_mode = "xray", v2ray_dns_mode = "tcp"})
 o:depends({dns_mode = "xray", v2ray_dns_mode = "doh"})
 o.rmempty = false
@@ -281,23 +277,11 @@ o.rmempty = false
 if has_chnlist and api.is_finded("chinadns-ng") then
     o = s:taboption("DNS", Flag, "chinadns_ng", translate("ChinaDNS-NG"), translate("The effect is better, but will increase the memory."))
     o.default = "0"
-    if api.is_finded("smartdns") then
-        o:depends({dns_shunt = "dnsmasq", dns_mode = "dns2socks"})
-        o:depends({dns_shunt = "dnsmasq", dns_mode = "dns2tcp"})
-        o:depends({dns_shunt = "dnsmasq", dns_mode = "v2ray", v2ray_dns_mode = "tcp"})
-        o:depends({dns_shunt = "dnsmasq", dns_mode = "v2ray", v2ray_dns_mode = "doh"})
-        o:depends({dns_shunt = "dnsmasq", dns_mode = "xray", v2ray_dns_mode = "tcp"})
-        o:depends({dns_shunt = "dnsmasq", dns_mode = "xray", v2ray_dns_mode = "doh"})
-        o:depends({dns_shunt = "dnsmasq", dns_mode = "udp"})
-    else
-        o:depends({dns_mode = "dns2socks"})
-        o:depends({dns_mode = "dns2tcp"})
-        o:depends({dns_mode = "v2ray", v2ray_dns_mode = "tcp"})
-        o:depends({dns_mode = "v2ray", v2ray_dns_mode = "doh"})
-        o:depends({dns_mode = "xray", v2ray_dns_mode = "tcp"})
-        o:depends({dns_mode = "xray", v2ray_dns_mode = "doh"})
-        o:depends({dns_mode = "udp"})
-    end
+	o:depends({dns_mode = "dns2socks"})
+	o:depends({dns_mode = "dns2tcp"})
+	o:depends({dns_mode = "xray", v2ray_dns_mode = "tcp"})
+	o:depends({dns_mode = "xray", v2ray_dns_mode = "doh"})
+	o:depends({dns_mode = "udp"})
 end
 
 o = s:taboption("DNS", Button, "clear_ipset", translate("Clear IPSET"), translate("Try this feature if the rule modification does not take effect."))
@@ -420,9 +404,8 @@ o.default = 1
 o.rmempty = false
 
 socks_node = s:option(ListValue, "node", translate("Socks Node"))
-socks_node:value("tcp", translate("Same as the tcp node"))
 
-local n = 0
+local n = 1
 uci:foreach(appname, "socks", function(s)
     if s[".name"] == section then
         return false

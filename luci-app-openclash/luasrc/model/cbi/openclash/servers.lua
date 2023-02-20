@@ -11,6 +11,11 @@ bold_off = [[</strong>]]
 
 m = Map(openclash,  translate("Servers manage and Config create"))
 m.pageaction = false
+m.description=translate("Attention:")..
+"<br/>"..translate("1. Before modifying the configuration file, please click the button below to read the configuration file")..
+"<br/>"..translate("2. Proxy-providers address can be directly filled in the subscription link")..
+"<br/>"..
+"<br/>"..translate("Introduction to proxy usage: https://lancellc.gitbook.io/clash/clash-config-file/proxies")
 
 s = m:section(TypedSection, "openclash")
 s.anonymous = true
@@ -105,6 +110,13 @@ o.cfgvalue    = function(...)
     return Flag.cfgvalue(...) or "1"
 end
 
+o = s:option(Flag, "manual", translate("Custom Tag"))
+o.rmempty = false
+o.default = "0"
+o.cfgvalue    = function(...)
+    return Flag.cfgvalue(...) or "0"
+end
+
 o = s:option(DummyValue, "config", translate("Config File"))
 function o.cfgvalue(...)
 	return Value.cfgvalue(...) or translate("all")
@@ -143,6 +155,13 @@ o.cfgvalue    = function(...)
     return Flag.cfgvalue(...) or "1"
 end
 
+o = s:option(Flag, "manual", translate("Custom Tag"))
+o.rmempty = false
+o.default = "0"
+o.cfgvalue    = function(...)
+    return Flag.cfgvalue(...) or "0"
+end
+
 o = s:option(DummyValue, "config", translate("Config File"))
 function o.cfgvalue(...)
 	return Value.cfgvalue(...) or translate("all")
@@ -178,10 +197,6 @@ function o.cfgvalue(...)
 		return translate("None")
 	end
 end
-
-o = s:option(DummyValue,"server",translate("Ping Latency"))
-o.template="openclash/ping"
-o.width="10%"
 
 local tt = {
     {Delete_Unused_Servers, Delete_Servers, Delete_Proxy_Provider, Delete_Groups}
@@ -265,7 +280,6 @@ o.write = function()
   luci.http.redirect(luci.dispatcher.build_url("admin", "services", "openclash"))
 end
 
-m:append(Template("openclash/server_list"))
 m:append(Template("openclash/toolbar_show"))
 
 return m

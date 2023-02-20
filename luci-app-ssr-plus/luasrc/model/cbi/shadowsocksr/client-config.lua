@@ -166,6 +166,9 @@ end
 if is_finded("hysteria") then
 	o:value("hysteria", translate("Hysteria"))
 end
+if is_finded("tuic-client") then
+	o:value("tuic", translate("TUIC"))
+end
 if is_finded("ipt2socks") then
 	o:value("socks5", translate("Socks5"))
 end
@@ -210,6 +213,7 @@ o:depends("type", "v2ray")
 o:depends("type", "trojan")
 o:depends("type", "naiveproxy")
 o:depends("type", "hysteria")
+o:depends("type", "tuic")
 o:depends("type", "socks5")
 
 o = s:option(Value, "server_port", translate("Server Port"))
@@ -221,6 +225,7 @@ o:depends("type", "v2ray")
 o:depends("type", "trojan")
 o:depends("type", "naiveproxy")
 o:depends("type", "hysteria")
+o:depends("type", "tuic")
 o:depends("type", "socks5")
 
 o = s:option(Flag, "auth_enable", translate("Enable Authentication"))
@@ -244,6 +249,7 @@ o:depends("type", "ssr")
 o:depends("type", "ss")
 o:depends("type", "trojan")
 o:depends("type", "naiveproxy")
+o:depends("type", "tuic")
 o:depends({type = "socks5", auth_enable = true})
 o:depends({type = "v2ray", v2ray_protocol = "http", auth_enable = true})
 o:depends({type = "v2ray", v2ray_protocol = "socks", socks_ver = "5", auth_enable = true})
@@ -360,6 +366,44 @@ o.rmempty = true
 
 o = s:option(Flag, "disable_mtu_discovery", translate("Disable Path MTU discovery"))
 o:depends("type", "hysteria")
+o.rmempty = true
+
+-- [[ TUIC ]]
+o = s:option(ListValue, "udp_relay_mode", translate("UDP relay mode"))
+o:depends("type", "tuic")
+o:value("native", translate("native"))
+o:value("quic", translate("QUIC"))
+o.default = "native"
+o.rmempty = true
+
+o = s:option(ListValue, "congestion_controller", translate("Congestion control algorithm"))
+o:depends("type", "tuic")
+o:value("bbr", translate("BBR"))
+o:value("cubic", translate("CUBIC"))
+o:value("new_reno", translate("New Reno"))
+o.default = "cubic"
+o.rmempty = true
+
+o = s:option(Value, "heartbeat_interval", translate("Heartbeat interval"))
+o:depends("type", "tuic")
+o.datatype = "uinteger"
+o.default = "10000"
+o.rmempty = true
+
+o = s:option(Flag, "disable_sni", translate("Disable SNI"))
+o:depends("type", "tuic")
+o.default = 0
+o.rmempty = true
+
+o = s:option(Flag, "reduce_rtt", translate("Enable 0-RTT QUIC handshake"))
+o:depends("type", "tuic")
+o.default = 0
+o.rmempty = true
+
+o = s:option(Value, "max_udp_relay_packet_size", translate("Max UDP relay packet size"))
+o:depends("type", "tuic")
+o.datatype = "uinteger"
+o.default = "1500"
 o.rmempty = true
 
 -- VmessId
@@ -670,15 +714,21 @@ o.default = "0"
 
 if is_finded("xray") then
 	-- [[ uTLS ]]--
-	o = s:option(ListValue, "fingerprint", translate("Finger Print"))
-	o:value("disable", translate("disable"))
-	o:value("firefox", translate("firefox"))
+	o = s:option(Value, "fingerprint", translate("Finger Print"))
+	o:value("", translate("disable"))
 	o:value("chrome", translate("chrome"))
+	o:value("firefox", translate("firefox"))
 	o:value("safari", translate("safari"))
+	o:value("ios", translate("ios"))
+	o:value("android", translate("android"))
+	o:value("edge", translate("edge"))
+	o:value("360", translate("360"))
+	o:value("qq", translate("qq"))
+	o:value("random", translate("random"))
 	o:value("randomized", translate("randomized"))
 	o:depends({type = "v2ray", tls = true})
 	o:depends({type = "v2ray", xtls = true})
-	o.default = "disable"
+	o.default = ""
 end
 
 o = s:option(Value, "tls_host", translate("TLS Host"))
@@ -686,6 +736,12 @@ o.datatype = "hostname"
 o:depends("tls", true)
 o:depends("xtls", true)
 o:depends("type", "hysteria")
+o.rmempty = true
+
+o = s:option(DynamicList, "tls_alpn", translate("TLS ALPN"))
+o:depends("tls", true)
+o:depends("xtls", true)
+o:depends("type", "tuic")
 o.rmempty = true
 
 o = s:option(Value, "quic_tls_alpn", translate("QUIC TLS ALPN"))
@@ -721,6 +777,7 @@ o:depends("type", "naiveproxy")
 o = s:option(Flag, "certificate", translate("Self-signed Certificate"))
 o.rmempty = true
 o.default = "0"
+o:depends("type", "tuic")
 o:depends({type = "hysteria", insecure = false})
 o:depends({type = "trojan", tls = true, insecure = false})
 o:depends({type = "v2ray", v2ray_protocol = "vmess", tls = true, insecure = false})
